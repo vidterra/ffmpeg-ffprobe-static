@@ -1,5 +1,6 @@
 *.swp
 .DS_Store
+.idea
 node_modules/
 npm-debug.log
 
@@ -16,3 +17,7 @@ bin/*
 /ffprobe.exe
 /ffprobe.README
 /ffprobe.LICENSE
+/ffplay
+/ffplay.exe
+/ffplay.README
+/ffplay.LICENSE

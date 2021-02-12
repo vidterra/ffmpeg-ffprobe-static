@@ -8,7 +8,7 @@ const envPaths = require('env-paths')
 const FileCache = require('@derhuerst/http-basic/lib/FileCache').default
 var ProgressBar = require("progress");
 var request = require('@derhuerst/http-basic')
-var {ffmpegPath, ffprobePath} = require(".");
+var {ffmpegPath, ffprobePath, ffplayPath} = require(".");
 var pkg = require("./package");
 
 const exitOnError = (err) => {
@@ -19,14 +19,14 @@ const warnWith = (msg) => (err) => {
   console.warn(msg)
 }
 
-if (!ffmpegPath || !ffprobePath) {
+if (!ffmpegPath || !ffprobePath || !ffplayPath) {
   exitOnError('ffmpeg-ffprobe-static install failed: No binary found for architecture')
 }
 
 try {
-  if (fs.statSync(ffmpegPath).isFile() && fs.statSync(ffprobePath).isFile()) {
-    console.info('ffmpeg/ffprobe is installed already.')
-    process.exit(0)
+  if (fs.statSync(ffmpegPath).isFile() && fs.statSync(ffprobePath).isFile() && fs.statSync(ffplayPath).isFile()) {
+    console.info('ffmpeg/ffprobe/ffplay is installed already.')
+    //process.exit(0)
   }
 } catch (err) {
   if (err && err.code !== 'ENOENT') exitOnError(err)
@@ -51,8 +51,8 @@ const normalizeS3Url = (url) => {
   url = new URL(url)
   if (url.hostname.slice(-17) !== '.s3.amazonaws.com') return url.href
   const query = Array.from(url.searchParams.entries())
-  .filter(([key]) => key.slice(0, 6).toLowerCase() !== 'x-amz-')
-  .reduce((query, [key, val]) => ({...query, [key]: val}), {})
+    .filter(([key]) => key.slice(0, 6).toLowerCase() !== 'x-amz-')
+    .reduce((query, [key, val]) => ({...query, [key]: val}), {})
   url.search = encodeQuery(query)
   return url.href
 }
@@ -70,7 +70,9 @@ cache.getCacheKey = (url) => {
   return FileCache.prototype.getCacheKey(normalizeS3Url(url))
 }
 
-const noop = () => {}
+const noop = () => {
+}
+
 function downloadFile(url, destinationPath, progressCallback = noop) {
   let fulfill, reject;
   let totalBytes = 0;
@@ -104,6 +106,8 @@ function downloadFile(url, destinationPath, progressCallback = noop) {
     file.on("error", error => reject(error));
     response.body.pipe(file)
 
+    console.log('111111111111111111', progressCallback)
+
     if (!response.fromCache && progressCallback) {
       const cLength = response.headers["content-length"]
       totalBytes = cLength ? parseInt(cLength, 10) : null
@@ -117,6 +121,7 @@ function downloadFile(url, destinationPath, progressCallback = noop) {
 }
 
 let progressBar = null;
+
 function onProgress(deltaBytes, totalBytes) {
   if (totalBytes === null) return;
   if (!progressBar) {
@@ -141,11 +146,12 @@ const releaseName = (
 )
 const arch = process.env.npm_config_arch || os.arch()
 const platform = process.env.npm_config_platform || os.platform()
-const base = process.env.FFMPEG_FFPROBE_STATIC_BASE_URL || 'https://github.com/descriptinc/ffmpeg-ffprobe-static/releases/download/';
+const base = process.env.FFMPEG_FFPROBE_STATIC_BASE_URL || 'https://github.com/vidterra/ffmpeg-ffprobe-static/releases/download/';
 console.log(`[ffmpeg-ffprobe-static] Using base url: ${base}`);
 const baseUrl = new URL(release, base).href;
 const ffmpegUrl = `${baseUrl}/ffmpeg-${platform}-${arch}`
 const ffprobeUrl = `${baseUrl}/ffprobe-${platform}-${arch}`
+const ffplayUrl = `${baseUrl}/ffplay-${platform}-${arch}`
 const readmeUrl = `${baseUrl}/${platform}-${arch}.README`
 const licenseUrl = `${baseUrl}/${platform}-${arch}.LICENSE`
 
@@ -158,6 +164,10 @@ downloadFile(ffmpegUrl, ffmpegPath, onProgress)
   .then(() => downloadFile(ffprobeUrl, ffprobePath, onProgress))
   .then(() => {
     fs.chmodSync(ffprobePath, 0o755) // make executable
+  })
+  .then(() => downloadFile(ffplayUrl, ffplayPath, onProgress))
+  .then(() => {
+    fs.chmodSync(ffplayPath, 0o755) // make executable
   })
   .catch(exitOnError)
 
